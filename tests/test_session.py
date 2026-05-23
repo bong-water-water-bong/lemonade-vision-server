@@ -1,15 +1,16 @@
 import tempfile
 import time
-from lemonade_vision.store.schema import init_db
 from lemonade_vision.session import (
-    create_session, validate_session, close_session, expire_old_sessions,
+    close_session,
+    create_session,
+    expire_old_sessions,
+    validate_session,
 )
+from lemonade_vision.store.schema import init_db
 
 
 def _db():
-    tmp = tempfile.mktemp(suffix=".db", dir="/tmp")
-    db = init_db(tmp)
-    return db
+    return init_db(":memory:")
 
 
 def test_create_and_validate_session():
