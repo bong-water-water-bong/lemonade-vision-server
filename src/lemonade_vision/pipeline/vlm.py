@@ -69,7 +69,7 @@ def _strip_fences(text: str) -> str:
 class VLMClient:
     def __init__(self, base_url: str = "http://localhost:8001") -> None:
         self._base_url = base_url
-        self._http = httpx.Client(base_url=base_url, timeout=ONBOARD_TIMEOUT)
+        self._http = httpx.AsyncClient(base_url=base_url, timeout=ONBOARD_TIMEOUT)
 
     async def extract_product_info(
         self,
@@ -90,7 +90,7 @@ class VLMClient:
             content.append({"type": "text", "text": f"Operator narration: {narration}"})
 
         try:
-            resp = self._http.post(
+            resp = await self._http.post(
                 "/v1/chat/completions",
                 json={
                     "model": "local",
@@ -120,7 +120,7 @@ class VLMClient:
     async def deduce_product_signals(self, query: str) -> dict:
         content = DEDUCE_PROMPT.replace("{query}", query)
         try:
-            resp = self._http.post(
+            resp = await self._http.post(
                 "/v1/chat/completions",
                 json={
                     "model": "local",
