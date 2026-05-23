@@ -27,7 +27,7 @@ def depth_to_dimensions(
         return None
 
     fov_h_rad = math.radians(IPHONE_FOV_H_DEG)
-    fov_v_rad = fov_h_rad / IPHONE_ASPECT
+    fov_v_rad = 2.0 * math.atan(math.tan(fov_h_rad / 2.0) / IPHONE_ASPECT)
 
     # Physical size of the full frame at the scan distance
     frame_w_mm = 2.0 * scan_distance_mm * math.tan(fov_h_rad / 2.0)
