@@ -19,6 +19,7 @@ from lemonade_vision.draft import DraftAssembler
 from lemonade_vision.session import create_session
 from lemonade_vision.api.capture import router as capture_router
 from lemonade_vision.api.product import router as product_router
+from lemonade_vision.api.deduce import router as deduce_router
 
 
 def create_app(data_dir: str | None = None) -> FastAPI:
@@ -65,6 +66,7 @@ def create_app(data_dir: str | None = None) -> FastAPI:
 
     app.include_router(capture_router)
     app.include_router(product_router)
+    app.include_router(deduce_router)
     app.mount("/images", StaticFiles(directory=str(images_path)), name="images")
 
     @app.post("/session/start")
