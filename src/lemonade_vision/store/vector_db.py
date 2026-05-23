@@ -1,25 +1,26 @@
 from __future__ import annotations
+from pathlib import Path
 import numpy as np
 import chromadb
 
 
 class VectorStore:
-    def __init__(self, chroma_path: str) -> None:
-        self._client = chromadb.PersistentClient(path=chroma_path)
+    def __init__(self, chroma_path: str | Path) -> None:
+        self._client = chromadb.PersistentClient(path=str(chroma_path))
         self._visual = self._client.get_or_create_collection("product_visual")
         self._text = self._client.get_or_create_collection("product_text")
 
-    def upsert_visual(self, id_: str, vector: np.ndarray, metadata: dict) -> None:
+    def upsert_visual(self, product_id: str, embedding: np.ndarray, metadata: dict) -> None:
         self._visual.upsert(
-            ids=[id_],
-            embeddings=[vector.tolist()],
+            ids=[product_id],
+            embeddings=[embedding.tolist()],
             metadatas=[metadata],
         )
 
-    def upsert_text(self, id_: str, vector: np.ndarray, metadata: dict) -> None:
+    def upsert_text(self, product_id: str, embedding: np.ndarray, metadata: dict) -> None:
         self._text.upsert(
-            ids=[id_],
-            embeddings=[vector.tolist()],
+            ids=[product_id],
+            embeddings=[embedding.tolist()],
             metadatas=[metadata],
         )
 
@@ -54,4 +55,4 @@ class VectorStore:
         return out
 
     def product_count(self) -> int:
-        return self._text.count()
+        return self._visual.count()

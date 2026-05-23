@@ -4,36 +4,33 @@ from pathlib import Path
 
 DDL = """
 CREATE TABLE IF NOT EXISTS products (
-    sku TEXT PRIMARY KEY,
-    upc TEXT,
+    product_id TEXT PRIMARY KEY,
+    barcode TEXT,
     brand TEXT NOT NULL,
     flavor TEXT NOT NULL,
     category TEXT NOT NULL,
     puff_count INTEGER,
     nicotine_mg INTEGER,
-    ocr_text TEXT,
-    narration TEXT,
+    confidence REAL NOT NULL DEFAULT 0.85,
+    requires_attendant BOOLEAN NOT NULL DEFAULT 0,
     width_mm REAL,
     height_mm REAL,
     depth_mm REAL,
-    confidence_threshold REAL NOT NULL DEFAULT 0.85,
-    requires_attendant BOOLEAN NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS product_aliases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sku TEXT NOT NULL REFERENCES products(sku) ON DELETE CASCADE,
+    product_id TEXT NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
     alias TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS product_images (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sku TEXT NOT NULL REFERENCES products(sku) ON DELETE CASCADE,
-    angle TEXT NOT NULL,
-    path TEXT NOT NULL,
-    is_primary BOOLEAN NOT NULL DEFAULT 0
+    product_id TEXT NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    label TEXT NOT NULL DEFAULT 'main'
 );
 
 CREATE TABLE IF NOT EXISTS capture_sessions (
