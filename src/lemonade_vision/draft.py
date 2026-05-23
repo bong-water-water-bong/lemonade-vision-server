@@ -1,7 +1,20 @@
 # src/lemonade_vision/draft.py
 from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
 from typing import Optional
+
+import httpx
+import numpy as np
+
+from lemonade_vision.pipeline.barcode import extract_upc
+from lemonade_vision.pipeline.dimensions import depth_to_dimensions
+from lemonade_vision.pipeline.frames import frames_from_video
 from lemonade_vision.pipeline.vlm import VLMResult
+
+_logger = logging.getLogger(__name__)
 
 
 def assemble_draft(
@@ -67,12 +80,6 @@ class DraftAssembler:
         narration_path: Optional[str],
         frame_out_dir: str,
     ) -> dict:
-        from pathlib import Path
-        from lemonade_vision.pipeline.frames import frames_from_video
-        from lemonade_vision.pipeline.barcode import extract_upc
-        from lemonade_vision.pipeline.dimensions import depth_to_dimensions
-        import numpy as np
-
         # 1. Extract frames from rotation video
         frame_paths: list[str] = []
         if rotation_video_path:
@@ -80,13 +87,15 @@ class DraftAssembler:
                 frame_paths = frames_from_video(
                     Path(rotation_video_path), Path(frame_out_dir)
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                _logger.warning("frames_from_video failed: %s", exc)
 
-        # Add close-up stills
-        for angle, path in still_paths.items():
-            if path not in frame_paths:
+        # Add close-up stills (deduplicated)
+        seen_paths: set[str] = set(frame_paths)
+        for path in still_paths.values():
+            if path not in seen_paths:
                 frame_paths.append(path)
+                seen_paths.add(path)
 
         # 2. Barcode from UPC still (preferred) or any frame
         upc: Optional[str] = None
@@ -113,10 +122,10 @@ class DraftAssembler:
         if depth_path:
             try:
                 grid = np.load(depth_path) if depth_path.endswith(".npy") else \
-                       np.array(__import__("json").loads(Path(depth_path).read_text()))
+                       np.array(json.loads(Path(depth_path).read_text()))
                 dimensions = depth_to_dimensions(grid)
-            except Exception:
-                pass
+            except Exception as exc:
+                _logger.warning("depth_to_dimensions failed: %s", exc)
 
         return assemble_draft(
             job_id=job_id,
@@ -129,7 +138,6 @@ class DraftAssembler:
         )
 
     async def _transcribe(self, audio_path: str) -> Optional[str]:
-        import httpx
         try:
             with open(audio_path, "rb") as f:
                 data = f.read()

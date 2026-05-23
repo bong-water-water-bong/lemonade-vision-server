@@ -1,4 +1,8 @@
 # tests/test_draft.py
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from lemonade_vision.draft import assemble_draft
 
 
@@ -49,3 +53,93 @@ def test_assemble_draft_vlm_unavailable():
     )
     assert result["vlm_status"] == "unavailable"
     assert result["brand"] is None
+
+
+@pytest.mark.asyncio
+async def test_draft_assembler_run_with_stills():
+    from lemonade_vision.draft import DraftAssembler
+    from lemonade_vision.pipeline.vlm import VLMResult
+
+    vlm_client = MagicMock()
+    vlm_client.extract_product_info = AsyncMock(return_value=VLMResult(
+        brand="Elf Bar", vlm_status="ok", confidence=0.9
+    ))
+    assembler = DraftAssembler(vlm_client=vlm_client, embedding_model=None)
+
+    import tempfile
+    from pathlib import Path
+    from PIL import Image
+    import numpy as np
+
+    with tempfile.TemporaryDirectory(dir="/tmp") as d:
+        # Create a dummy still
+        img = Image.fromarray(np.full((100, 100, 3), 128, dtype=np.uint8))
+        still = str(Path(d) / "upc.jpg")
+        img.save(still)
+
+        result = await assembler.run(
+            job_id="j1", session_id="s1",
+            rotation_video_path=None,
+            still_paths={"upc": still},
+            depth_path=None,
+            narration_path=None,
+            frame_out_dir=d,
+        )
+
+    assert result["brand"] == "Elf Bar"
+    assert still in result["frame_paths"]
+
+
+@pytest.mark.asyncio
+async def test_draft_assembler_run_resilient_to_bad_video():
+    from lemonade_vision.draft import DraftAssembler
+    from lemonade_vision.pipeline.vlm import VLMResult
+
+    vlm_client = MagicMock()
+    vlm_client.extract_product_info = AsyncMock(return_value=VLMResult(vlm_status="unavailable"))
+    assembler = DraftAssembler(vlm_client=vlm_client, embedding_model=None)
+
+    import tempfile
+    with tempfile.TemporaryDirectory(dir="/tmp") as d:
+        result = await assembler.run(
+            job_id="j2", session_id="s1",
+            rotation_video_path="/tmp/nonexistent_video.mp4",
+            still_paths={},
+            depth_path=None,
+            narration_path=None,
+            frame_out_dir=d,
+        )
+
+    assert result["vlm_status"] == "unavailable"
+    assert result["frame_paths"] == []
+
+
+@pytest.mark.asyncio
+async def test_draft_assembler_no_duplicate_paths():
+    from lemonade_vision.draft import DraftAssembler
+    from lemonade_vision.pipeline.vlm import VLMResult
+
+    vlm_client = MagicMock()
+    vlm_client.extract_product_info = AsyncMock(return_value=VLMResult(vlm_status="ok"))
+    assembler = DraftAssembler(vlm_client=vlm_client, embedding_model=None)
+
+    import tempfile
+    from pathlib import Path
+    from PIL import Image
+    import numpy as np
+
+    with tempfile.TemporaryDirectory(dir="/tmp") as d:
+        img = Image.fromarray(np.full((100, 100, 3), 128, dtype=np.uint8))
+        still = str(Path(d) / "front.jpg")
+        img.save(still)
+
+        result = await assembler.run(
+            job_id="j3", session_id="s1",
+            rotation_video_path=None,
+            still_paths={"front": still, "back": still},  # same path twice
+            depth_path=None,
+            narration_path=None,
+            frame_out_dir=d,
+        )
+
+    assert result["frame_paths"].count(still) == 1
