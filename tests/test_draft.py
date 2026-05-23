@@ -22,6 +22,8 @@ def test_assemble_draft_with_all_signals():
     assert result["upc"] == "012345678901"
     assert result["signal_scores"]["upc"] > 0
     assert result["signal_scores"]["vlm"] > 0
+    assert result["signal_scores"]["embedding"] == 0.5
+    assert result["signal_scores"]["dimension"] == 0.5
 
 
 def test_assemble_draft_missing_barcode_still_ok():
