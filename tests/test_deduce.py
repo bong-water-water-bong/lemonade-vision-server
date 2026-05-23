@@ -42,6 +42,8 @@ def test_deduce_text_returns_candidates(client_with_products):
     assert resp.status_code == 200
     data = resp.json()
     assert "candidates" in data
+    assert len(data["candidates"]) > 0
+    assert any(c["sku"] == "ELFBAR001" for c in data["candidates"])
 
 
 def test_deduce_text_missing_query_returns_422(client_with_products):

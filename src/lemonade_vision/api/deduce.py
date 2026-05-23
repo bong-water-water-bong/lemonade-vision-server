@@ -42,9 +42,6 @@ async def deduce_text(body: DeduceRequest, request: Request):
     ]))
     query_vec = embed_model.encode_text(enriched)
 
-    if vector_store.product_count() == 0:
-        return DeduceResponse(candidates=[], query_used=enriched)
-
     raw = vector_store.query_text(query_vec, top_k=body.top_k * 2)
 
     candidates: list[DeduceCandidate] = []
