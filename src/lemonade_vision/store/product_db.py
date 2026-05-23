@@ -20,7 +20,7 @@ class ProductDB:
         self._db = conn
 
     def insert_product(self, data: dict) -> str:
-        product_id = str(uuid.uuid4())
+        product_id = str(data.get("product_id") or uuid.uuid4())
         now = _now()
         self._db.execute(
             """INSERT INTO products

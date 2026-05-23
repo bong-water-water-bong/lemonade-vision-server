@@ -1,11 +1,14 @@
 # src/lemonade_vision/api/product.py
 from __future__ import annotations
 import json
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 
 from lemonade_vision.models import CommitRequest, CommitResponse, DraftProduct, ProductPatch
+
+_logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -79,8 +82,8 @@ async def commit_product(body: CommitRequest, request: Request):
             })
             url = image_store.save_image(body.sku, frame_path, label=angle)
             product_db.add_image(body.sku, url, angle)
-        except Exception:
-            pass
+        except Exception as exc:
+            _logger.warning("failed to index frame %s: %s", frame_path, exc)
 
     db.execute(
         "UPDATE draft_jobs SET status='committed' WHERE job_id=?", (body.job_id,)
