@@ -25,9 +25,13 @@ class VectorStore:
         )
 
     def query_text(self, vector: np.ndarray, top_k: int = 3) -> list[dict]:
+        count = self._text.count()
+        if count == 0:
+            return []
+        n_results = min(top_k, count)
         results = self._text.query(
             query_embeddings=[vector.tolist()],
-            n_results=min(top_k, self._text.count() or 1),
+            n_results=n_results,
             include=["metadatas", "distances"],
         )
         out = []
@@ -40,9 +44,13 @@ class VectorStore:
         return out
 
     def query_visual(self, vector: np.ndarray, top_k: int = 3) -> list[dict]:
+        count = self._visual.count()
+        if count == 0:
+            return []
+        n_results = min(top_k, count)
         results = self._visual.query(
             query_embeddings=[vector.tolist()],
-            n_results=min(top_k, self._visual.count() or 1),
+            n_results=n_results,
             include=["metadatas", "distances"],
         )
         out = []

@@ -4,6 +4,12 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+_UPDATABLE_FIELDS = frozenset({
+    "barcode", "brand", "flavor", "category",
+    "puff_count", "nicotine_mg", "confidence",
+    "requires_attendant", "width_mm", "height_mm", "depth_mm",
+})
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -70,6 +76,9 @@ class ProductDB:
     def update_product(self, product_id: str, fields: dict) -> None:
         if not fields:
             return
+        invalid = set(fields) - _UPDATABLE_FIELDS
+        if invalid:
+            raise ValueError(f"Non-updatable field(s): {invalid}")
         set_clause = ", ".join(f"{k} = ?" for k in fields)
         values = list(fields.values()) + [_now(), product_id]
         self._db.execute(
