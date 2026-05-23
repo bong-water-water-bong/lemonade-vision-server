@@ -56,18 +56,16 @@ def create_app(data_dir: str | None = None) -> FastAPI:
         app.state.assembler = assembler
         app.state.sessions_path = str(sessions_path)
 
-        # Mount images directory now that it's been created
-        images_path.mkdir(parents=True, exist_ok=True)
-        app.mount("/images", StaticFiles(directory=str(images_path)), name="images")
-
         yield
 
         db.close()
 
+    images_path.mkdir(parents=True, exist_ok=True)
     app = FastAPI(title="lemonade-vision-server", version="0.1.0", lifespan=lifespan)
 
     app.include_router(capture_router)
     app.include_router(product_router)
+    app.mount("/images", StaticFiles(directory=str(images_path)), name="images")
 
     @app.post("/session/start")
     async def session_start(request: Request):

@@ -140,7 +140,7 @@ async def _run_pipeline(db, assembler, job_id, session, tmp_dir, state):
         narration_path = session.get("narration_path")
 
         still_paths: dict[str, str] = {}
-        for p in tmp_dir.glob("still_*.jpg"):
+        for p in tmp_dir.glob("still_*.*"):
             parts = p.stem.split("_")
             if len(parts) >= 2:
                 still_paths[parts[1]] = str(p)
