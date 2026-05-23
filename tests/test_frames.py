@@ -1,14 +1,14 @@
 import tempfile
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 from PIL import Image
+
 from lemonade_vision.pipeline.frames import (
+    SECTORS,
     laplacian_variance,
     select_sharpest_frames,
-    SECTORS,
 )
-
-FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _make_sharp_jpg(path: Path) -> None:
@@ -39,7 +39,7 @@ def test_select_sharpest_frames_returns_one_per_sector():
             _make_sharp_jpg(p)
             frames.append((i * (360 // (SECTORS * 2)), str(p)))
         selected = select_sharpest_frames(frames)
-        assert len(selected) <= SECTORS
+        assert len(selected) == SECTORS
 
 
 def test_laplacian_variance_missing_file_returns_zero():

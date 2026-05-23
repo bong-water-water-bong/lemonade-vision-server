@@ -6,7 +6,9 @@ no OpenCV dependency required.
 from __future__ import annotations
 import subprocess
 from pathlib import Path
+
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 from PIL import Image
 
 SECTORS = 12          # 30° per sector across 360°
@@ -21,8 +23,6 @@ def laplacian_variance(image_path: Path) -> float:
     except Exception:
         return 0.0
     kernel = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=float)
-    from numpy.lib.stride_tricks import sliding_window_view
-    h, w = arr.shape
     patches = sliding_window_view(arr, (3, 3)).reshape(-1, 9)
     k = kernel.flatten()
     lap = patches @ k
