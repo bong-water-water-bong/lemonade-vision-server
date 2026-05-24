@@ -52,7 +52,7 @@ iPhone client
 
 **`store/`** — Three storage backends initialized at startup and injected into `app.state`: `ProductDB` (SQLite for structured product data), `VectorStore` (ChromaDB with two collections — `product_visual` for image embeddings, `product_text` for text embeddings), and `ImageStore` (filesystem directory served as `/images` static mount).
 
-**`session.py`** — Captures are grouped by `capture_session`. A session is a UUID tied to a temporary directory and a 10-minute TTL stored in SQLite `capture_sessions`. The client authenticates every capture upload via `X-Session-Token` header. Sessions are cleaned up on expiry or explicit `DELETE /session/{session_id}`, which removes both the DB row and the `tmp_dir` subtree.
+**`session.py`** — Captures are grouped by `capture_session`. A session is created via `POST /session/start` (returns a QR pairing code for the iPhone client). A session is a UUID tied to a temporary directory and a 10-minute TTL stored in SQLite `capture_sessions`. The client authenticates every capture upload via `X-Session-Token` header. Sessions are cleaned up on expiry or explicit `DELETE /session/{session_id}`, which removes both the DB row and the `tmp_dir` subtree.
 
 **`server.py`** — `create_app()` factory wires together all state at startup via FastAPI `lifespan`. The VLM client points to `http://localhost:8001` (the Lemonade/FLM NPU inference server). The ASR client points to `http://localhost:8004` (fw-server). The `/health` endpoint probes the VLM and reports ChromaDB product count, making it suitable for cashier's readiness check.
 
@@ -66,7 +66,7 @@ iPhone client
 
 - **Per-scan sessions with TTL and tmp_dir cleanup**: Each capture session creates an isolated temporary directory. The 10-minute TTL and `shutil.rmtree` on close prevent uncleaned frame/depth/audio files from accumulating. Session expiry is lazy (checked on access) rather than scheduled, so there is no background sweeper thread.
 
-- **`asyncio.create_task` for pipeline execution**: `/capture/finalize` returns HTTP 202 immediately and runs the pipeline as a background asyncio task. This prevents the iPhone client from hanging during a 10–15 second VLM call. The cashier polls `draft_jobs.status` until it transitions from `processing` → `ready` or `failed`.
+- **`asyncio.create_task` for pipeline execution**: `/capture/finalize` returns HTTP 200 (FastAPI default — no `status_code` argument on the route decorator) and runs the pipeline as a background asyncio task. This prevents the iPhone client from hanging during a 10–15 second VLM call. The `/capture/video` endpoint returns 202. The finalize status diverges from async design intent and could be corrected by adding `status_code=202` to the `/capture/finalize` route decorator. The cashier polls `draft_jobs.status` until it transitions from `processing` → `ready` or `failed`.
 
 - **VLM at localhost:8001 with hard timeout**: The VLM client uses a 15-second `ONBOARD_TIMEOUT` for product extraction and a 3-second `DEDUCE_TIMEOUT` for query signal extraction. If the VLM is unreachable, `VLMResult(vlm_status="unavailable")` is returned and the VLM score contribution drops to 0.0 — the scan continues with reduced confidence rather than failing.
 
