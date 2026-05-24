@@ -2,6 +2,7 @@
 from __future__ import annotations
 import asyncio
 import shutil
+import subprocess
 import uuid
 from pathlib import Path
 from typing import Annotated
@@ -96,10 +97,21 @@ async def upload_audio(
 ):
     tmp_dir = Path(session["tmp_dir"])
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    suffix = Path(file.filename or "narration.wav").suffix or ".wav"
-    narration_path = tmp_dir / f"narration{suffix}"
-    with open(narration_path, "wb") as f:
+    suffix = Path(file.filename or "narration.bin").suffix or ".bin"
+    raw_path = tmp_dir / f"narration_raw{suffix}"
+    with open(raw_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
+
+    narration_path = tmp_dir / "narration.wav"
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", str(raw_path),
+             "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", str(narration_path)],
+            check=True, capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise HTTPException(status_code=500, detail=f"ffmpeg conversion failed: {exc}")
+
     db = request.app.state.db
     db.execute(
         "UPDATE capture_sessions SET narration_path = ? WHERE session_id = ?",

@@ -54,3 +54,19 @@ def test_deduce_text_missing_query_returns_422(client_with_products):
 def test_deduce_audio_no_file_returns_422(client_with_products):
     resp = client_with_products.post("/deduce/audio")
     assert resp.status_code == 422
+
+
+def test_deduce_audio_calls_ffmpeg_for_m4a(client_with_products):
+    """Non-WAV uploads trigger ffmpeg conversion before transcription."""
+    import subprocess as _subprocess
+    with patch("lemonade_vision.api.deduce.subprocess.run") as mock_run:
+        mock_run.side_effect = _subprocess.CalledProcessError(1, "ffmpeg")
+        resp = client_with_products.post(
+            "/deduce/audio",
+            files={"file": ("query.m4a", b"\x00" * 16, "audio/m4a")},
+        )
+    mock_run.assert_called_once()
+    cmd = mock_run.call_args[0][0]
+    assert cmd[0] == "ffmpeg"
+    assert "pcm_s16le" in cmd
+    assert resp.status_code == 500

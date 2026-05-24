@@ -2,6 +2,7 @@
 from __future__ import annotations
 import logging
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -79,14 +80,25 @@ async def deduce_text(body: DeduceRequest, request: Request):
 @router.post("/deduce/audio", response_model=DeduceResponse)
 async def deduce_audio(request: Request, file: UploadFile = File(...)):
     with tempfile.TemporaryDirectory(dir="/tmp") as d:
-        audio_path = Path(d) / "query.wav"
+        suffix = Path(file.filename or "query.bin").suffix or ".bin"
+        audio_path = Path(d) / f"query{suffix}"
         with open(audio_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
+
+        wav_path = Path(d) / "query.wav"
+        try:
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", str(audio_path),
+                 "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", str(wav_path)],
+                check=True, capture_output=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            raise HTTPException(status_code=500, detail=f"ffmpeg conversion failed: {exc}")
 
         transcript: Optional[str] = None
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                with open(audio_path, "rb") as af:
+                with open(wav_path, "rb") as af:
                     resp = await client.post(
                         "http://localhost:8004/transcribe",
                         content=af.read(),
