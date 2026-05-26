@@ -1,6 +1,7 @@
 # src/lemonade_vision/draft.py
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -102,12 +103,12 @@ class DraftAssembler:
         bg_frame_paths: list[str] = list(frame_paths)
         try:
             bg_out_dir = Path(frame_out_dir) / "bg"
-            bg_out_dir.mkdir(exist_ok=True)
+            bg_out_dir.mkdir(parents=True, exist_ok=True)
             bg_frame_paths = []
             for fp in frame_paths:
                 in_path = Path(fp)
                 out_path = bg_out_dir / f"bg_{in_path.name}"
-                bg_frame_paths.append(str(remove_background(in_path, out_path)))
+                bg_frame_paths.append(str(await asyncio.to_thread(remove_background, in_path, out_path)))
         except Exception as exc:
             _logger.warning("background_removal stage failed: %s", exc)
             bg_frame_paths = list(frame_paths)
@@ -128,9 +129,13 @@ class DraftAssembler:
             narration = await self._transcribe(narration_path)
 
         # 4. VLM extraction
-        vlm_result = await self._vlm.extract_product_info(
-            bg_frame_paths[:4], narration=narration
-        )
+        try:
+            vlm_result = await self._vlm.extract_product_info(
+                bg_frame_paths[:4], narration=narration
+            )
+        except Exception as exc:
+            _logger.warning("vlm extraction stage failed: %s", exc)
+            vlm_result = VLMResult(vlm_status="unavailable")
 
         # 5. Dimensions from depth
         dimensions: Optional[tuple[float, float, float]] = None
