@@ -143,3 +143,213 @@ async def test_draft_assembler_no_duplicate_paths():
         )
 
     assert result["frame_paths"].count(still) == 1
+
+
+@pytest.mark.asyncio
+async def test_embedding_lookup_with_hit():
+    from lemonade_vision.draft import DraftAssembler
+    from lemonade_vision.pipeline.vlm import VLMResult
+    import numpy as np
+
+    vlm_client = MagicMock()
+    vlm_client.extract_product_info = AsyncMock(return_value=VLMResult(
+        brand="Elf Bar", vlm_status="ok", confidence=0.9
+    ))
+
+    embed_model = MagicMock()
+    embed_model.encode_image.return_value = np.array([0.1, 0.2, 0.3], dtype=np.float32)
+
+    vector_store = MagicMock()
+    vector_store.query_visual.return_value = [{"id": "prod-1", "distance": 0.6}]
+
+    assembler = DraftAssembler(
+        vlm_client=vlm_client, embedding_model=embed_model, vector_store=vector_store,
+    )
+
+    import tempfile
+    from pathlib import Path
+    from PIL import Image
+
+    with tempfile.TemporaryDirectory(dir="/tmp") as d:
+        img = Image.fromarray(np.full((100, 100, 3), 128, dtype=np.uint8))
+        still = str(Path(d) / "front.jpg")
+        img.save(still)
+
+        result = await assembler.run(
+            job_id="j1", session_id="s1",
+            rotation_video_path=None,
+            still_paths={"front": still},
+            depth_path=None,
+            narration_path=None,
+            frame_out_dir=d,
+        )
+
+    embed_model.encode_image.assert_called_once_with(still)
+    vector_store.query_visual.assert_called_once()
+    assert result["signal_scores"]["embedding"] == 0.7
+    assert result["brand"] == "Elf Bar"
+
+
+@pytest.mark.asyncio
+async def test_embedding_empty_hit_fallback():
+    from lemonade_vision.draft import DraftAssembler
+    from lemonade_vision.pipeline.vlm import VLMResult
+    import numpy as np
+
+    vlm_client = MagicMock()
+    vlm_client.extract_product_info = AsyncMock(return_value=VLMResult(
+        brand="Lost Mary", vlm_status="ok", confidence=0.88
+    ))
+
+    embed_model = MagicMock()
+    embed_model.encode_image.return_value = np.array([0.1, 0.2, 0.3], dtype=np.float32)
+
+    vector_store = MagicMock()
+    vector_store.query_visual.return_value = []
+
+    assembler = DraftAssembler(
+        vlm_client=vlm_client, embedding_model=embed_model, vector_store=vector_store,
+    )
+
+    import tempfile
+    from pathlib import Path
+    from PIL import Image
+
+    with tempfile.TemporaryDirectory(dir="/tmp") as d:
+        img = Image.fromarray(np.full((100, 100, 3), 128, dtype=np.uint8))
+        still = str(Path(d) / "front.jpg")
+        img.save(still)
+
+        result = await assembler.run(
+            job_id="j2", session_id="s1",
+            rotation_video_path=None,
+            still_paths={"front": still},
+            depth_path=None,
+            narration_path=None,
+            frame_out_dir=d,
+        )
+
+    assert result["signal_scores"]["embedding"] == 0.5
+
+
+@pytest.mark.asyncio
+async def test_embedding_distance_scoring():
+    from lemonade_vision.draft import DraftAssembler
+    from lemonade_vision.pipeline.vlm import VLMResult
+    import numpy as np
+
+    vlm_client = MagicMock()
+    vlm_client.extract_product_info = AsyncMock(return_value=VLMResult(
+        brand="Geek Bar", vlm_status="ok", confidence=0.85
+    ))
+
+    embed_model = MagicMock()
+    embed_model.encode_image.return_value = np.array([0.5, 0.5], dtype=np.float32)
+
+    vector_store = MagicMock()
+    vector_store.query_visual.return_value = [{"id": "prod-2", "distance": 0.0}]
+
+    assembler = DraftAssembler(
+        vlm_client=vlm_client, embedding_model=embed_model, vector_store=vector_store,
+    )
+
+    import tempfile
+    from pathlib import Path
+    from PIL import Image
+
+    with tempfile.TemporaryDirectory(dir="/tmp") as d:
+        img = Image.fromarray(np.full((100, 100, 3), 128, dtype=np.uint8))
+        still = str(Path(d) / "front.jpg")
+        img.save(still)
+
+        result = await assembler.run(
+            job_id="j3", session_id="s1",
+            rotation_video_path=None,
+            still_paths={"front": still},
+            depth_path=None,
+            narration_path=None,
+            frame_out_dir=d,
+        )
+
+    assert result["signal_scores"]["embedding"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_embedding_exception_fallback():
+    from lemonade_vision.draft import DraftAssembler
+    from lemonade_vision.pipeline.vlm import VLMResult
+    import numpy as np
+
+    vlm_client = MagicMock()
+    vlm_client.extract_product_info = AsyncMock(return_value=VLMResult(
+        brand="Raz", vlm_status="ok", confidence=0.8
+    ))
+
+    embed_model = MagicMock()
+    embed_model.encode_image.side_effect = RuntimeError("CLIP crashed")
+
+    vector_store = MagicMock()
+
+    assembler = DraftAssembler(
+        vlm_client=vlm_client, embedding_model=embed_model, vector_store=vector_store,
+    )
+
+    import tempfile
+    from pathlib import Path
+    from PIL import Image
+
+    with tempfile.TemporaryDirectory(dir="/tmp") as d:
+        img = Image.fromarray(np.full((100, 100, 3), 128, dtype=np.uint8))
+        still = str(Path(d) / "front.jpg")
+        img.save(still)
+
+        result = await assembler.run(
+            job_id="j4", session_id="s1",
+            rotation_video_path=None,
+            still_paths={"front": still},
+            depth_path=None,
+            narration_path=None,
+            frame_out_dir=d,
+        )
+
+    assert result["signal_scores"]["embedding"] == 0.5
+    assert result["brand"] == "Raz"
+
+
+@pytest.mark.asyncio
+async def test_embedding_skipped_when_no_vector_store():
+    from lemonade_vision.draft import DraftAssembler
+    from lemonade_vision.pipeline.vlm import VLMResult
+
+    vlm_client = MagicMock()
+    vlm_client.extract_product_info = AsyncMock(return_value=VLMResult(
+        brand="Flum", vlm_status="ok", confidence=0.9
+    ))
+
+    embed_model = MagicMock()
+
+    assembler = DraftAssembler(
+        vlm_client=vlm_client, embedding_model=embed_model, vector_store=None,
+    )
+
+    import tempfile
+    from pathlib import Path
+    from PIL import Image
+    import numpy as np
+
+    with tempfile.TemporaryDirectory(dir="/tmp") as d:
+        img = Image.fromarray(np.full((100, 100, 3), 128, dtype=np.uint8))
+        still = str(Path(d) / "front.jpg")
+        img.save(still)
+
+        result = await assembler.run(
+            job_id="j5", session_id="s1",
+            rotation_video_path=None,
+            still_paths={"front": still},
+            depth_path=None,
+            narration_path=None,
+            frame_out_dir=d,
+        )
+
+    embed_model.encode_image.assert_not_called()
+    assert result["signal_scores"]["embedding"] == 0.5
