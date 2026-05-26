@@ -6,9 +6,12 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+import asyncio
+
 import httpx
 import numpy as np
 
+from lemonade_vision import ASR_BASE_URL, cosine_to_confidence
 from lemonade_vision.pipeline.barcode import extract_upc
 from lemonade_vision.pipeline.dimensions import depth_to_dimensions
 from lemonade_vision.pipeline.frames import frames_from_video
@@ -67,7 +70,7 @@ def assemble_draft(
 class DraftAssembler:
     """Orchestrates the full onboarding pipeline from session data to draft record."""
 
-    def __init__(self, vlm_client, embedding_model, fw_base_url: str = "http://localhost:8004", vector_store=None):
+    def __init__(self, vlm_client, embedding_model, fw_base_url: str = ASR_BASE_URL, vector_store=None):
         self._vlm = vlm_client
         self._embed = embedding_model
         self._fw_base_url = fw_base_url
@@ -134,13 +137,9 @@ class DraftAssembler:
         embedding_score: float | None = None
         if frame_paths and self._vector_store is not None and self._embed is not None:
             try:
-                query_vec = self._embed.encode_image(frame_paths[0])
-                hits = self._vector_store.query_visual(query_vec, top_k=1)
-                if hits:
-                    best_distance = hits[0]["distance"]
-                    embedding_score = max(0.0, 1.0 - best_distance / 2.0)
-                else:
-                    embedding_score = 0.5
+                embedding_score = await asyncio.to_thread(
+                    self._lookup_embedding, frame_paths[0]
+                )
             except Exception as exc:
                 _logger.warning("embedding similarity lookup failed: %s", exc)
 
@@ -154,6 +153,13 @@ class DraftAssembler:
             frame_paths=frame_paths,
             embedding_score=embedding_score,
         )
+
+    def _lookup_embedding(self, frame_path: str) -> float:
+        query_vec = self._embed.encode_image(frame_path)
+        hits = self._vector_store.query_visual(query_vec, top_k=1)
+        if hits:
+            return cosine_to_confidence(hits[0]["distance"])
+        return 0.5
 
     async def _transcribe(self, audio_path: str) -> Optional[str]:
         try:
