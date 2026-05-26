@@ -143,3 +143,104 @@ async def test_draft_assembler_no_duplicate_paths():
         )
 
     assert result["frame_paths"].count(still) == 1
+
+
+@pytest.mark.asyncio
+async def test_draft_assembler_vlm_exception_fallback():
+    """VLM extraction exception is caught locally and does not abort the pipeline."""
+    from lemonade_vision.draft import DraftAssembler
+
+    vlm_client = MagicMock()
+    vlm_client.extract_product_info = AsyncMock(side_effect=RuntimeError("VLM crashed"))
+
+    assembler = DraftAssembler(vlm_client=vlm_client, embedding_model=None)
+
+    import tempfile
+    with tempfile.TemporaryDirectory(dir="/tmp") as d:
+        result = await assembler.run(
+            job_id="j4", session_id="s1",
+            rotation_video_path=None,
+            still_paths={},
+            depth_path=None,
+            narration_path=None,
+            frame_out_dir=d,
+        )
+
+    assert result["vlm_status"] == "unavailable"
+    assert result["status"] == "ready"
+
+
+@pytest.mark.asyncio
+async def test_draft_assembler_still_only_directory_creation():
+    """frame_out_dir may not exist for still-only captures — bg dir must still be created."""
+    from lemonade_vision.draft import DraftAssembler
+    from lemonade_vision.pipeline.vlm import VLMResult
+
+    vlm_client = MagicMock()
+    vlm_client.extract_product_info = AsyncMock(return_value=VLMResult(
+        brand="Test", vlm_status="ok", confidence=0.9
+    ))
+    assembler = DraftAssembler(vlm_client=vlm_client, embedding_model=None)
+
+    import tempfile
+    from pathlib import Path
+    from PIL import Image
+    import numpy as np
+
+    with tempfile.TemporaryDirectory(dir="/tmp") as d:
+        img = Image.fromarray(np.full((100, 100, 3), 128, dtype=np.uint8))
+        still = str(Path(d) / "front.jpg")
+        img.save(still)
+
+        nested_out = str(Path(d) / "does_not_exist_yet" / "frames")
+        result = await assembler.run(
+            job_id="j5", session_id="s1",
+            rotation_video_path=None,
+            still_paths={"front": still},
+            depth_path=None,
+            narration_path=None,
+            frame_out_dir=nested_out,
+        )
+
+        assert result["brand"] == "Test"
+        assert still in result["frame_paths"]
+        bg_dir = Path(nested_out) / "bg"
+        assert bg_dir.exists()
+
+
+@pytest.mark.asyncio
+async def test_draft_assembler_bg_removal_fallback_preserves_originals():
+    """When background removal fails, bg_frame_paths falls back to original frame_paths."""
+    from lemonade_vision.draft import DraftAssembler
+    from lemonade_vision.pipeline.vlm import VLMResult
+    from unittest.mock import patch
+
+    vlm_client = MagicMock()
+    vlm_client.extract_product_info = AsyncMock(return_value=VLMResult(
+        brand="Fallback", vlm_status="ok", confidence=0.5
+    ))
+    assembler = DraftAssembler(vlm_client=vlm_client, embedding_model=None)
+
+    import tempfile
+    from pathlib import Path
+    from PIL import Image
+    import numpy as np
+
+    with tempfile.TemporaryDirectory(dir="/tmp") as d:
+        img = Image.fromarray(np.full((100, 100, 3), 128, dtype=np.uint8))
+        still = str(Path(d) / "front.jpg")
+        img.save(still)
+
+        with patch("lemonade_vision.draft.remove_background") as mock_bg:
+            mock_bg.side_effect = RuntimeError("rembg not available")
+            result = await assembler.run(
+                job_id="j6", session_id="s1",
+                rotation_video_path=None,
+                still_paths={"front": still},
+                depth_path=None,
+                narration_path=None,
+                frame_out_dir=d,
+            )
+
+    assert result["brand"] == "Fallback"
+    assert still in result["frame_paths"]

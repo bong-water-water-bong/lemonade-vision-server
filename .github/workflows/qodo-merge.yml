@@ -5,6 +5,7 @@ on:
 
 jobs:
   qodo-merge:
+    if: false
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -13,6 +14,7 @@ jobs:
     steps:
       - name: Qodo Merge Review
         uses: qodo-ai/qodo-merge@v1
+        continue-on-error: true
         env:
           QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
         with:

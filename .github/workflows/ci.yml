@@ -21,11 +21,11 @@ jobs:
       - name: Set up Python
         run: uv python install
 
-      - name: Install dependencies
-        run: uv pip install -e ".[dev]"
-
       - name: Run ruff
-        run: uv run ruff check .
+        run: uv run --extra dev ruff check .
+
+      - name: Install system deps
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libzbar0
 
       - name: Run tests
-        run: uv run pytest
+        run: uv run --extra dev pytest
