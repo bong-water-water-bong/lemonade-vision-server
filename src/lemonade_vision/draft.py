@@ -25,11 +25,13 @@ def assemble_draft(
     dimensions: Optional[tuple[float, float, float]],
     narration: Optional[str],
     frame_paths: list[str],
+    embedding_score: float | None = None,
 ) -> dict:
     upc_score = 1.0 if upc else 0.0
     vlm_score = vlm_result.confidence if vlm_result.vlm_status == "ok" else 0.0
     dim_score = 0.5 if dimensions else 0.0
-    embedding_score = 0.5 if frame_paths else 0.0
+    if embedding_score is None:
+        embedding_score = 0.5 if frame_paths else 0.0
 
     signal_scores = {
         "upc": upc_score,
@@ -65,10 +67,11 @@ def assemble_draft(
 class DraftAssembler:
     """Orchestrates the full onboarding pipeline from session data to draft record."""
 
-    def __init__(self, vlm_client, embedding_model, fw_base_url: str = "http://localhost:8004"):
+    def __init__(self, vlm_client, embedding_model, fw_base_url: str = "http://localhost:8004", vector_store=None):
         self._vlm = vlm_client
         self._embed = embedding_model
         self._fw_base_url = fw_base_url
+        self._vector_store = vector_store
 
     async def run(
         self,
@@ -127,6 +130,20 @@ class DraftAssembler:
             except Exception as exc:
                 _logger.warning("depth_to_dimensions failed: %s", exc)
 
+        # 6. Embedding similarity via ChromaDB
+        embedding_score: float | None = None
+        if frame_paths and self._vector_store is not None and self._embed is not None:
+            try:
+                query_vec = self._embed.encode_image(frame_paths[0])
+                hits = self._vector_store.query_visual(query_vec, top_k=1)
+                if hits:
+                    best_distance = hits[0]["distance"]
+                    embedding_score = max(0.0, 1.0 - best_distance / 2.0)
+                else:
+                    embedding_score = 0.5
+            except Exception as exc:
+                _logger.warning("embedding similarity lookup failed: %s", exc)
+
         return assemble_draft(
             job_id=job_id,
             session_id=session_id,
@@ -135,6 +152,7 @@ class DraftAssembler:
             dimensions=dimensions,
             narration=narration,
             frame_paths=frame_paths,
+            embedding_score=embedding_score,
         )
 
     async def _transcribe(self, audio_path: str) -> Optional[str]:

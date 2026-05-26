@@ -46,7 +46,7 @@ def create_app(data_dir: str | None = None) -> FastAPI:
         image_store = ImageStore(str(images_path))
         vlm_client = VLMClient(base_url="http://localhost:8001")
         embed_model = EmbeddingModel()
-        assembler = DraftAssembler(vlm_client, embed_model)
+        assembler = DraftAssembler(vlm_client, embed_model, vector_store=vector_store)
 
         app.state.db = db
         app.state.product_db = product_db
