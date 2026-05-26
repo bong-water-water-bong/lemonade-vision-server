@@ -35,10 +35,32 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 - <<'PYEOF'
-          import os, json, urllib.request, pathlib, subprocess
+          import os, json, urllib.request, urllib.error, pathlib, subprocess
 
-          api_key = os.environ["GEMINI_API_KEY"]
+          def post_comment(pr, repo, body):
+              subprocess.run(
+                  ["gh", "pr", "comment", pr, "--repo", repo, "--body", body],
+                  check=False,
+              )
+
+          pr = os.environ["PR_NUMBER"]
+          repo = os.environ["REPO"]
           diff = pathlib.Path("/tmp/pr.diff").read_text(errors="replace")
+
+          if not diff.strip():
+              post_comment(pr, repo, "Gemini review skipped: empty diff.")
+              exit(0)
+
+          api_key = os.environ.get("GEMINI_API_KEY", "")
+          if not api_key:
+              post_comment(pr, repo, "Gemini review skipped: `GEMINI_API_KEY` secret not set.")
+              exit(0)
+
+          models = [
+              "gemini-2.5-flash",
+              "gemini-2.0-flash",
+              "gemini-1.5-flash",
+          ]
 
           prompt = (
               "You are a careful code reviewer. Review the following pull request diff "
@@ -48,34 +70,45 @@ jobs:
               "```diff\n" + diff + "\n```"
           )
 
-          payload = json.dumps({
-              "contents": [{"parts": [{"text": prompt}]}],
-              "generationConfig": {"temperature": 0.2, "maxOutputTokens": 8192}
-          }).encode()
+          last_error = None
+          for model in models:
+              try:
+                  payload = json.dumps({
+                      "contents": [{"parts": [{"text": prompt}]}],
+                      "generationConfig": {"temperature": 0.2, "maxOutputTokens": 8192}
+                  }).encode()
 
-          url = (
-              "https://generativelanguage.googleapis.com/v1beta/models/"
-              "gemini-2.5-flash:generateContent?key=" + api_key
-          )
-          req = urllib.request.Request(
-              url, data=payload, headers={"Content-Type": "application/json"}
-          )
-          with urllib.request.urlopen(req, timeout=60) as r:
-              data = json.load(r)
+                  url = (
+                      "https://generativelanguage.googleapis.com/v1beta/models/"
+                      f"{model}:generateContent?key=" + api_key
+                  )
+                  req = urllib.request.Request(
+                      url, data=payload, headers={"Content-Type": "application/json"}
+                  )
+                  with urllib.request.urlopen(req, timeout=60) as r:
+                      data = json.load(r)
 
-          review = data["candidates"][0]["content"]["parts"][0]["text"]
+                  review = data["candidates"][0]["content"]["parts"][0]["text"]
+                  body = (
+                      "### Gemini Flash review\n\n"
+                      + review
+                      + "\n\n---\n"
+                      "*Automated review via gemini-review workflow*"
+                  )
+                  post_comment(pr, repo, body)
+                  exit(0)
+              except urllib.error.HTTPError as e:
+                  err_body = e.read().decode(errors="replace")
+                  last_error = f"Model `{model}`: HTTP {e.code} — {err_body[:500]}"
+              except Exception as e:
+                  last_error = f"Model `{model}`: {e}"
 
           body = (
-              "### Gemini Flash review\n\n"
-              + review
-              + "\n\n---\n"
-              "*Automated review via gemini-review workflow*"
+              "### Gemini Flash review — failed\n\n"
+              "Could not reach any Gemini model:\n\n"
+              f"```\n{last_error}\n```\n\n"
+              "*Review skipped; check `GEMINI_API_KEY` access.*"
           )
-
-          pr = os.environ["PR_NUMBER"]
-          repo = os.environ["REPO"]
-          subprocess.run(
-              ["gh", "pr", "comment", pr, "--repo", repo, "--body", body],
-              check=True,
-          )
+          post_comment(pr, repo, body)
+          exit(0)
           PYEOF

@@ -13,6 +13,7 @@ jobs:
     steps:
       - name: Qodo Merge Review
         uses: qodo-ai/qodo-merge@v1
+        continue-on-error: true
         env:
           QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
         with:
