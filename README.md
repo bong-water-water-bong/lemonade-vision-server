@@ -86,7 +86,6 @@ docs/wiki/           # Architecture, pipeline, confidence-scoring articles
 v0.1. All pipeline stages implemented. Open threads:
 
 - Embedding score is a placeholder `0.5` — real ChromaDB similarity lookup not yet wired
-- `background.py` remove-background not called in `DraftAssembler.run()`
 - ASR URL (`http://localhost:8004`) hardcoded — no `VISION_ASR_URL` env override
 
 See [Project Wiki](docs/wiki/README.md) for full details.

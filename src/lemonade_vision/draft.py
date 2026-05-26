@@ -9,6 +9,7 @@ from typing import Optional
 import httpx
 import numpy as np
 
+from lemonade_vision.pipeline.background import remove_background
 from lemonade_vision.pipeline.barcode import extract_upc
 from lemonade_vision.pipeline.dimensions import depth_to_dimensions
 from lemonade_vision.pipeline.frames import frames_from_video
@@ -97,6 +98,20 @@ class DraftAssembler:
                 frame_paths.append(path)
                 seen_paths.add(path)
 
+        # 1.5 Background removal — preprocess frames for VLM extraction
+        bg_frame_paths: list[str] = list(frame_paths)
+        try:
+            bg_out_dir = Path(frame_out_dir) / "bg"
+            bg_out_dir.mkdir(exist_ok=True)
+            bg_frame_paths = []
+            for fp in frame_paths:
+                in_path = Path(fp)
+                out_path = bg_out_dir / f"bg_{in_path.name}"
+                bg_frame_paths.append(str(remove_background(in_path, out_path)))
+        except Exception as exc:
+            _logger.warning("background_removal stage failed: %s", exc)
+            bg_frame_paths = list(frame_paths)
+
         # 2. Barcode from UPC still (preferred) or any frame
         upc: Optional[str] = None
         if "upc" in still_paths:
@@ -114,7 +129,7 @@ class DraftAssembler:
 
         # 4. VLM extraction
         vlm_result = await self._vlm.extract_product_info(
-            frame_paths[:4], narration=narration
+            bg_frame_paths[:4], narration=narration
         )
 
         # 5. Dimensions from depth
