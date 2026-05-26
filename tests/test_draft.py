@@ -156,8 +156,6 @@ async def test_draft_assembler_vlm_exception_fallback():
     assembler = DraftAssembler(vlm_client=vlm_client, embedding_model=None)
 
     import tempfile
-    from pathlib import Path
-
     with tempfile.TemporaryDirectory(dir="/tmp") as d:
         result = await assembler.run(
             job_id="j4", session_id="s1",
