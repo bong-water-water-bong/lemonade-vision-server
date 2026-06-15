@@ -2,6 +2,18 @@
 
 > FastAPI server that identifies vape-shop products from iPhone multi-modal capture (video, stills, LiDAR depth, audio) and serves the result to lemonade-cashier's `sensors.*` layer.
 
+## Runtime Setup
+
+- This repo intentionally owns the heavier vision stack: FastAPI, Torch,
+  CLIP, ChromaDB, VLM, and ASR integrations.
+- Department repos do not install this service during their base
+  `make install`.
+- Run the service only when local product identification is needed; if
+  VLM/ASR are unavailable, cashier must fall back to manual entry or
+  lower-confidence verification.
+- Product drafts are proposals. Cashier remains authoritative for SKU,
+  price, sale close, and audit state.
+
 ## Current State
 
 **What is working (by inspection):**

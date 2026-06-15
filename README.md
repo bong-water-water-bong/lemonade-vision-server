@@ -11,6 +11,18 @@
 
 `lemonade-vision-server` is the vision pipeline component of the [Lemonade Store](https://github.com/bong-water-water-bong/lemonade-store) suite. It receives iPhone capture sessions, runs a six-stage pipeline (barcode, VLM, CLIP embeddings, dimensions, background removal), scores confidence across signals, and returns a structured product draft to lemonade-cashier's sensor fusion layer.
 
+## Suite runtime boundary
+
+- This repo is intentionally heavier than the department contract repos:
+  FastAPI, Torch, CLIP, ChromaDB, and vision helpers belong here.
+- It is not installed by `make install` in cashier or department repos.
+  Cashier talks to it through the future `sensors.*` boundary when the
+  local service is explicitly running.
+- Product drafts are proposals. Cashier inventory, price, and close
+  decisions remain authoritative in the deterministic cashier flow.
+- VLM/ASR services must be local. If they are unavailable, callers must
+  fall back to manual product entry or lower-confidence verification.
+
 ## What it does
 
 ```text
