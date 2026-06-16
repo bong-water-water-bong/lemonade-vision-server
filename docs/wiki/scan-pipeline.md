@@ -4,7 +4,7 @@
 
 ## Overview
 
-The pipeline runs inside `DraftAssembler.run()` (in `draft.py`) as a single `async` method called from the background task created by `/capture/finalize`. It has five active stages — frame selection, barcode extraction, ASR transcription, VLM extraction, and dimension estimation — plus a sixth module (`background.py`) for image preprocessing. Every stage is written to fail silently: exceptions are caught internally and the stage contributes a zero or None to `assemble_draft()` rather than aborting the pipeline. The stages produce collectively: a UPC string, a `VLMResult` dataclass, physical dimension tuple, a narration transcript, and a list of usable frame paths.
+The pipeline runs inside `DraftAssembler.run()` (in `draft.py`) as a single `async` method called from the background task created by `/capture/finalize`. It has six stages: frame selection, background removal, barcode extraction, ASR transcription, VLM extraction, and dimension estimation. Every stage is written to fail silently: exceptions are caught internally and the stage contributes a zero or None to `assemble_draft()` rather than aborting the pipeline. The stages produce collectively: a UPC string, a `VLMResult` dataclass, physical dimension tuple, a narration transcript, and a list of usable frame paths.
 
 ## How It Works
 
@@ -28,9 +28,9 @@ If the session has a `narration_path`, the assembler POSTs the raw audio bytes t
 
 `depth_to_dimensions()` takes a 2D numpy array (the ARKit LiDAR depth grid) and a scan distance (default 350 mm). Using iPhone 15 Pro Max horizontal FOV of 69°, it computes the physical frame size at that distance, identifies foreground pixels as those with depth less than 95% of the scan distance, and measures the bounding-box span of foreground rows and columns. Width and height are derived from the fraction of frame pixels occupied. Depth estimate uses the 5th percentile of the raw depth grid (the closest surface, approximately the front face of the product). Returns a `(width_mm, height_mm, depth_mm)` tuple or None if the grid is empty or non-2D. The assembler reads depth from `.npy` (numpy binary) or falls back to `json.loads`.
 
-### Stage 6: Background Removal (`pipeline/background.py`)
+### Stage 1.5: Background Removal (`pipeline/background.py`)
 
-`remove_background()` wraps `rembg` to strip background from a single image, writing the result to a specified output path. If `rembg` is unavailable or raises, it falls back to `shutil.copy2` (passthrough). This module is standalone and not currently wired into `DraftAssembler.run()` — it exists as a utility for future preprocessing of reference images before embedding or VLM submission.
+`remove_background()` wraps `rembg` to strip backgrounds from extracted frames, writing results to a `bg/` subdirectory under `frame_out_dir`. The background-removed frame paths (`bg_frame_paths`) are then passed to VLM extraction (Stage 4) in place of the original frames. If `rembg` is unavailable or raises for an individual image, the function falls back to `shutil.copy2` (passthrough) so the pipeline continues with the original frame. If the entire background removal stage fails (e.g. out-of-disk), the assembler falls back to the original `frame_paths`.
 
 ## Key Decisions
 
@@ -44,7 +44,7 @@ If the session has a `narration_path`, the assembler POSTs the raw audio bytes t
 
 ## Gotchas
 
-- **`background.py` is not called by the assembler**: The background removal module is implemented and tested but never invoked in `DraftAssembler.run()`. Embeddings and VLM submissions use raw frames with backgrounds intact. Background-stripped images would likely improve embedding similarity scores for products against a busy scan environment.
+- **Background removal is applied to VLM frames only**: The background removal stage (1.5) processes frames before they reach VLM extraction (Stage 4). Barcode extraction (Stage 2) continues to use the original frames since barcode detection works best on unmodified images. Background-stripped images improve VLM extraction accuracy by eliminating shelf/store clutter from the product image.
 
 - **Depth JSON vs numpy mismatch**: The `_run_pipeline` coroutine in `capture.py` saves the depth upload always as `depth_<frame_id>.json`, but `DraftAssembler.run()` checks the file extension: `.npy` → `np.load`, otherwise → `json.loads`. If the client sends a numpy binary (which is more efficient for large depth grids), it must name the file with a `.npy` extension for the correct branch to execute; there is no content-sniffing.
 
