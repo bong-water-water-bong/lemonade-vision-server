@@ -10,6 +10,7 @@ from typing import Optional
 import httpx
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
+from lemonade_vision import ASR_BASE_URL, cosine_to_confidence
 from lemonade_vision.models import DeduceCandidate, DeduceRequest, DeduceResponse
 
 router = APIRouter()
@@ -19,10 +20,6 @@ BRAND_BONUS = 0.10
 FLAVOR_BONUS = 0.10
 
 _logger = logging.getLogger(__name__)
-
-
-def _cosine_to_confidence(distance: float) -> float:
-    return max(0.0, 1.0 - distance / 2.0)
 
 
 @router.post("/deduce/text", response_model=DeduceResponse)
@@ -49,7 +46,7 @@ async def deduce_text(body: DeduceRequest, request: Request):
     for hit in raw:
         meta = hit["metadata"]
         sku = hit["id"]
-        confidence = _cosine_to_confidence(hit["distance"])
+        confidence = cosine_to_confidence(hit["distance"])
 
         reasons: list[str] = []
         if brand_hint and meta.get("brand", "").lower() == brand_hint.lower():
@@ -100,7 +97,7 @@ async def deduce_audio(request: Request, file: UploadFile = File(...)):
             async with httpx.AsyncClient(timeout=5.0) as client:
                 with open(wav_path, "rb") as af:
                     resp = await client.post(
-                        "http://localhost:8004/transcribe",
+                        f"{ASR_BASE_URL}/transcribe",
                         content=af.read(),
                         headers={"Content-Type": "audio/wav"},
                     )
