@@ -14,6 +14,7 @@ dependencies = [
     "pyzbar>=0.1.9",
     "Pillow>=10.4",
     "numpy>=1.26",
+    "numba>=0.59",
     "open-clip-torch>=2.26",
     "torch>=2.3",
     "chromadb>=0.5",
