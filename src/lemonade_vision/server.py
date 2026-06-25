@@ -25,8 +25,7 @@ from lemonade_vision.api.deduce import router as deduce_router
 def create_app(data_dir: str | None = None) -> FastAPI:
     if data_dir is None:
         data_dir = os.environ.get(
-            "VISION_DATA_DIR",
-            str(Path.home() / "lemonade-vision-server" / "data")
+            "VISION_DATA_DIR", str(Path.home() / "lemonade-vision-server" / "data")
         )
 
     data_path = Path(data_dir)
@@ -71,25 +70,29 @@ def create_app(data_dir: str | None = None) -> FastAPI:
 
     @app.post("/session/start")
     async def session_start(request: Request):
-        import qrcode
-        import io
         import base64
+        import io
+
+        import qrcode
+
         tmp_dir = tempfile.mkdtemp(dir=str(sessions_path))
         sid = create_session(request.app.state.db, tmp_dir)
         qr = qrcode.make(sid)
         buf = io.BytesIO()
-        qr.save(buf, format="PNG")
+        qr.save(buf)
         b64 = base64.b64encode(buf.getvalue()).decode()
         return {"session_id": sid, "qr_png_b64": b64}
 
     @app.delete("/session/{session_id}", status_code=204)
     async def session_delete(session_id: str, request: Request):
         from lemonade_vision.session import close_session
+
         close_session(request.app.state.db, session_id)
 
     @app.get("/health", response_model=HealthResponse)
     async def health(request: Request):
         import httpx
+
         vlm_ok = False
         try:
             resp = httpx.get("http://localhost:8001/v1/models", timeout=2.0)
@@ -97,18 +100,18 @@ def create_app(data_dir: str | None = None) -> FastAPI:
         except Exception:
             pass
         count = request.app.state.vector_store.product_count()
-        return HealthResponse(
-            status="ok", vlm_reachable=vlm_ok, chroma_product_count=count
-        )
+        return HealthResponse(status="ok", vlm_reachable=vlm_ok, chroma_product_count=count)
 
     @app.get("/pairing/qr")
     async def pairing_qr(session_id: str, request: Request):
-        import qrcode
-        import io
         import base64
+        import io
+
+        import qrcode
+
         qr = qrcode.make(session_id)
         buf = io.BytesIO()
-        qr.save(buf, format="PNG")
+        qr.save(buf)
         return {"qr_png_b64": base64.b64encode(buf.getvalue()).decode()}
 
     return app
@@ -116,5 +119,6 @@ def create_app(data_dir: str | None = None) -> FastAPI:
 
 if __name__ == "__main__":
     import uvicorn
+
     app = create_app()
     uvicorn.run(app, host="0.0.0.0", port=8787)

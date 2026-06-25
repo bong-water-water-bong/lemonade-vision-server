@@ -24,9 +24,7 @@ def create_session(db: sqlite3.Connection, tmp_dir: str, ttl_seconds: int = 600)
     return session_id
 
 
-def validate_session(
-    db: sqlite3.Connection, session_id: str
-) -> Optional[sqlite3.Row]:
+def validate_session(db: sqlite3.Connection, session_id: str) -> Optional[sqlite3.Row]:
     row = db.execute(
         "SELECT * FROM capture_sessions WHERE session_id = ?", (session_id,)
     ).fetchone()
@@ -59,7 +57,5 @@ def _cleanup_session(db: sqlite3.Connection, row: dict) -> None:
     tmp = Path(row["tmp_dir"])
     if tmp.exists():
         shutil.rmtree(tmp, ignore_errors=True)
-    db.execute(
-        "DELETE FROM capture_sessions WHERE session_id = ?", (row["session_id"],)
-    )
+    db.execute("DELETE FROM capture_sessions WHERE session_id = ?", (row["session_id"],))
     db.commit()

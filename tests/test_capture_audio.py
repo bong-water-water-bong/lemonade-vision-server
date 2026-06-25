@@ -7,8 +7,10 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def authed_client(tmp_path):
     import os
+
     os.environ["VISION_DATA_DIR"] = str(tmp_path / "data")
     from lemonade_vision.server import create_app
+
     app = create_app(data_dir=str(tmp_path / "data"))
     with TestClient(app) as client:
         resp = client.post("/session/start")

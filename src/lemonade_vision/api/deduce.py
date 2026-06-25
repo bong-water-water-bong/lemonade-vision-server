@@ -36,11 +36,18 @@ async def deduce_text(body: DeduceRequest, request: Request):
     brand_hint: Optional[str] = signals.get("brand")
     flavor_hint: Optional[str] = signals.get("flavor")
 
-    enriched = " ".join(filter(None, [
-        brand_hint, flavor_hint,
-        signals.get("size"), signals.get("category"),
-        body.query,
-    ]))
+    enriched = " ".join(
+        filter(
+            None,
+            [
+                brand_hint,
+                flavor_hint,
+                signals.get("size"),
+                signals.get("category"),
+                body.query,
+            ],
+        )
+    )
     query_vec = embed_model.encode_text(enriched)
 
     raw = vector_store.query_text(query_vec, top_k=body.top_k * 2)
@@ -65,16 +72,18 @@ async def deduce_text(body: DeduceRequest, request: Request):
             confidence = min(1.0, confidence + ALIAS_BONUS)
             reasons.append("alias match")
 
-        candidates.append(DeduceCandidate(
-            sku=sku,
-            confidence=round(confidence, 4),
-            match_reason=", ".join(reasons) or "embedding similarity",
-            brand=meta.get("brand"),
-            flavor=meta.get("flavor"),
-        ))
+        candidates.append(
+            DeduceCandidate(
+                sku=sku,
+                confidence=round(confidence, 4),
+                match_reason=", ".join(reasons) or "embedding similarity",
+                brand=meta.get("brand"),
+                flavor=meta.get("flavor"),
+            )
+        )
 
     candidates.sort(key=lambda c: c.confidence, reverse=True)
-    return DeduceResponse(candidates=candidates[:body.top_k], query_used=enriched)
+    return DeduceResponse(candidates=candidates[: body.top_k], query_used=enriched)
 
 
 @router.post("/deduce/audio", response_model=DeduceResponse)
@@ -88,9 +97,21 @@ async def deduce_audio(request: Request, file: UploadFile = File(...)):
         wav_path = Path(d) / "query.wav"
         try:
             subprocess.run(
-                ["ffmpeg", "-y", "-i", str(audio_path),
-                 "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", str(wav_path)],
-                check=True, capture_output=True,
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(audio_path),
+                    "-ar",
+                    "16000",
+                    "-ac",
+                    "1",
+                    "-c:a",
+                    "pcm_s16le",
+                    str(wav_path),
+                ],
+                check=True,
+                capture_output=True,
             )
         except subprocess.CalledProcessError as exc:
             raise HTTPException(status_code=500, detail=f"ffmpeg conversion failed: {exc}")

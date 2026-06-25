@@ -3,6 +3,7 @@ Frame extraction from rotation video using ffmpeg subprocess.
 Sharpness scoring uses Laplacian variance on the grayscale image —
 no OpenCV dependency required.
 """
+
 from __future__ import annotations
 import subprocess
 from pathlib import Path
@@ -11,9 +12,9 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 from PIL import Image
 
-SECTORS = 12          # 30° per sector across 360°
-FPS_EXTRACT = 3.0     # frames per second to extract from video
-BLUR_THRESHOLD = 50.0 # Laplacian variance below this → discard
+SECTORS = 12  # 30° per sector across 360°
+FPS_EXTRACT = 3.0  # frames per second to extract from video
+BLUR_THRESHOLD = 50.0  # Laplacian variance below this → discard
 
 
 def laplacian_variance(image_path: Path) -> float:
@@ -34,9 +35,14 @@ def extract_frames_from_video(video_path: Path, out_dir: Path) -> list[Path]:
     pattern = str(out_dir / "frame_%04d.jpg")
     subprocess.run(
         [
-            "ffmpeg", "-y", "-i", str(video_path),
-            "-vf", f"fps={FPS_EXTRACT}",
-            "-q:v", "2",
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(video_path),
+            "-vf",
+            f"fps={FPS_EXTRACT}",
+            "-q:v",
+            "2",
             pattern,
         ],
         check=True,
@@ -66,8 +72,5 @@ def select_sharpest_frames(
 def frames_from_video(video_path: Path, out_dir: Path) -> list[str]:
     all_frames = extract_frames_from_video(video_path, out_dir)
     total = len(all_frames)
-    indexed = [
-        (int(i / max(total, 1) * 360), str(p))
-        for i, p in enumerate(all_frames)
-    ]
+    indexed = [(int(i / max(total, 1) * 360), str(p)) for i, p in enumerate(all_frames)]
     return select_sharpest_frames(indexed)

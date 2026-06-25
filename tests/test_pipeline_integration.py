@@ -4,6 +4,7 @@ End-to-end pipeline integration tests.
 Requires: VISION_INTEGRATION=1 and live VLM on :8001.
 Skipped automatically otherwise.
 """
+
 import os
 import json
 import tempfile
@@ -39,6 +40,7 @@ def sample_depth():
 @pytest.mark.asyncio
 async def test_vlm_client_real_call(sample_image):
     from lemonade_vision.pipeline.vlm import VLMClient
+
     client = VLMClient()
     result = await client.extract_product_info([sample_image], narration=None)
     assert result.vlm_status in ("ok", "unavailable")
@@ -47,6 +49,7 @@ async def test_vlm_client_real_call(sample_image):
 @pytest.mark.asyncio
 async def test_depth_to_dimensions_from_fixture():
     from lemonade_vision.pipeline.dimensions import depth_to_dimensions
+
     fixture = Path("tests/fixtures/depth-sample.json")
     grid = np.array(json.loads(fixture.read_text()))
     dims = depth_to_dimensions(grid)
@@ -60,6 +63,7 @@ async def test_depth_to_dimensions_from_fixture():
 async def test_full_server_health():
     from fastapi.testclient import TestClient
     from lemonade_vision.server import create_app
+
     with tempfile.TemporaryDirectory(dir="/tmp") as d:
         app = create_app(data_dir=d)
         with TestClient(app) as client:

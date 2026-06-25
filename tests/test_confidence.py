@@ -24,4 +24,5 @@ def test_low_confidence_reject():
 
 def test_weights_sum_to_one():
     from lemonade_vision.pipeline.confidence import WEIGHTS
+
     assert abs(sum(WEIGHTS.values()) - 1.0) < 1e-6

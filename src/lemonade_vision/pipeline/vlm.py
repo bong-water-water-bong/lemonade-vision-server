@@ -80,10 +80,12 @@ class VLMClient:
         for path in image_paths[:4]:
             try:
                 b64 = _encode_image(path)
-                content.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
-                })
+                content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
+                    }
+                )
             except Exception:
                 pass
         if narration:

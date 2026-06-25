@@ -29,8 +29,12 @@ def image_store():
 
 def test_product_db_insert_and_fetch(product_db):
     pid = product_db.insert_product(
-        {"brand": "Elf Bar", "flavor": "Mango Ice", "category": "disposable_vape",
-         "puff_count": 5000}
+        {
+            "brand": "Elf Bar",
+            "flavor": "Mango Ice",
+            "category": "disposable_vape",
+            "puff_count": 5000,
+        }
     )
     assert pid is not None
     row = product_db.get_product(pid)
@@ -67,6 +71,7 @@ def test_image_store_save_returns_url(image_store):
 
 
 # --- New test cases ---
+
 
 def test_product_db_update_product(product_db):
     pid = product_db.insert_product(

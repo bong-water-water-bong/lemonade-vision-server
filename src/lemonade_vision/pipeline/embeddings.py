@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
-from PIL import Image
 import open_clip
 import torch
+from PIL import Image
 
 
 class EmbeddingModel:
-    _model: open_clip.CLIP | None = None
-    _preprocess = None
-    _tokenizer = None
+    _model: Any | None = None
+    _preprocess: Any | None = None
+    _tokenizer: Any | None = None
 
     def __init__(
         self,
@@ -32,17 +34,25 @@ class EmbeddingModel:
 
     def encode_image(self, image_path: str) -> np.ndarray:
         self._load()
+        model = self._model
+        preprocess = self._preprocess
+        assert model is not None
+        assert preprocess is not None
         img = Image.open(image_path).convert("RGB")
-        tensor = self._preprocess(img).unsqueeze(0)  # type: ignore[arg-type]
+        tensor = preprocess(img).unsqueeze(0)
         with torch.no_grad():
-            features = self._model.encode_image(tensor)  # type: ignore[union-attr]
+            features = model.encode_image(tensor)
             features /= features.norm(dim=-1, keepdim=True)
         return features.squeeze(0).cpu().numpy().astype(np.float32)
 
     def encode_text(self, text: str) -> np.ndarray:
         self._load()
-        tokens = self._tokenizer([text])  # type: ignore[call-arg]
+        model = self._model
+        tokenizer = self._tokenizer
+        assert model is not None
+        assert tokenizer is not None
+        tokens = tokenizer([text])
         with torch.no_grad():
-            features = self._model.encode_text(tokens)  # type: ignore[union-attr]
+            features = model.encode_text(tokens)
             features /= features.norm(dim=-1, keepdim=True)
         return features.squeeze(0).cpu().numpy().astype(np.float32)

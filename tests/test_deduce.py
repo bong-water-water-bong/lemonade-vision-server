@@ -7,8 +7,10 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def client_with_products(tmp_path):
     import os
+
     os.environ["VISION_DATA_DIR"] = str(tmp_path / "data")
     from lemonade_vision.server import create_app
+
     app = create_app(data_dir=str(tmp_path / "data"))
 
     with TestClient(app) as client:
@@ -16,16 +18,26 @@ def client_with_products(tmp_path):
         vector_store = app.state.vector_store
         embed_model = app.state.embed_model
 
-        product_db.insert_product({
-            "product_id": "ELFBAR001",
-            "brand": "Elf Bar", "flavor": "Mango Ice",
-            "category": "disposable_vape", "puff_count": 5000,
-        })
+        product_db.insert_product(
+            {
+                "product_id": "ELFBAR001",
+                "brand": "Elf Bar",
+                "flavor": "Mango Ice",
+                "category": "disposable_vape",
+                "puff_count": 5000,
+            }
+        )
         vec = embed_model.encode_text("Elf Bar Mango Ice disposable_vape")
-        vector_store.upsert_text("ELFBAR001", vec, {
-            "sku": "ELFBAR001", "brand": "Elf Bar",
-            "flavor": "Mango Ice", "category": "disposable_vape",
-        })
+        vector_store.upsert_text(
+            "ELFBAR001",
+            vec,
+            {
+                "sku": "ELFBAR001",
+                "brand": "Elf Bar",
+                "flavor": "Mango Ice",
+                "category": "disposable_vape",
+            },
+        )
         yield client
 
 
@@ -59,6 +71,7 @@ def test_deduce_audio_no_file_returns_422(client_with_products):
 def test_deduce_audio_calls_ffmpeg_for_m4a(client_with_products):
     """Non-WAV uploads trigger ffmpeg conversion before transcription."""
     import subprocess as _subprocess
+
     with patch("lemonade_vision.api.deduce.subprocess.run") as mock_run:
         mock_run.side_effect = _subprocess.CalledProcessError(1, "ffmpeg")
         resp = client_with_products.post(

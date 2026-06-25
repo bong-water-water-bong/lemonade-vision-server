@@ -1,6 +1,9 @@
 from lemonade_vision.models import (
-    SessionStartResponse, SignalScores,
-    DraftProduct, DeduceCandidate, DeduceResponse,
+    SessionStartResponse,
+    SignalScores,
+    DraftProduct,
+    DeduceCandidate,
+    DeduceResponse,
 )
 
 

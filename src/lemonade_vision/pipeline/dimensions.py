@@ -4,6 +4,7 @@ Assumes iPhone 15 Pro Max horizontal FOV ≈ 69°.
 The product extent is estimated as the fraction of the frame
 occupied by pixels at the product depth plane.
 """
+
 from __future__ import annotations
 
 import math

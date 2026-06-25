@@ -4,11 +4,21 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-_UPDATABLE_FIELDS = frozenset({
-    "barcode", "brand", "flavor", "category",
-    "puff_count", "nicotine_mg", "confidence",
-    "requires_attendant", "width_mm", "height_mm", "depth_mm",
-})
+_UPDATABLE_FIELDS = frozenset(
+    {
+        "barcode",
+        "brand",
+        "flavor",
+        "category",
+        "puff_count",
+        "nicotine_mg",
+        "confidence",
+        "requires_attendant",
+        "width_mm",
+        "height_mm",
+        "depth_mm",
+    }
+)
 
 
 def _now() -> str:

@@ -105,9 +105,21 @@ async def upload_audio(
     narration_path = tmp_dir / "narration.wav"
     try:
         subprocess.run(
-            ["ffmpeg", "-y", "-i", str(raw_path),
-             "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", str(narration_path)],
-            check=True, capture_output=True,
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(raw_path),
+                "-ar",
+                "16000",
+                "-ac",
+                "1",
+                "-c:a",
+                "pcm_s16le",
+                str(narration_path),
+            ],
+            check=True,
+            capture_output=True,
         )
     except subprocess.CalledProcessError as exc:
         raise HTTPException(status_code=500, detail=f"ffmpeg conversion failed: {exc}")
@@ -129,24 +141,23 @@ async def finalize(
     job_id = str(uuid.uuid4())
     db = request.app.state.db
     from datetime import datetime, timezone
+
     db.execute(
         "INSERT INTO draft_jobs (job_id, session_id, status, created_at) VALUES (?,?,?,?)",
-        (job_id, session["session_id"], "processing",
-         datetime.now(timezone.utc).isoformat()),
+        (job_id, session["session_id"], "processing", datetime.now(timezone.utc).isoformat()),
     )
     db.commit()
 
     assembler = request.app.state.assembler
     tmp_dir = Path(session["tmp_dir"])
-    asyncio.create_task(
-        _run_pipeline(db, assembler, job_id, session, tmp_dir, request.app.state)
-    )
+    asyncio.create_task(_run_pipeline(db, assembler, job_id, session, tmp_dir, request.app.state))
     return FinalizeResponse(job_id=job_id)
 
 
 async def _run_pipeline(db, assembler, job_id, session, tmp_dir, state):
     import json as _json
     import traceback
+
     try:
         video_path = tmp_dir / "rotation.mp4"
         narration_path = session.get("narration_path")

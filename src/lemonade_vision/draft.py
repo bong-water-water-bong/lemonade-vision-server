@@ -84,9 +84,7 @@ class DraftAssembler:
         frame_paths: list[str] = []
         if rotation_video_path:
             try:
-                frame_paths = frames_from_video(
-                    Path(rotation_video_path), Path(frame_out_dir)
-                )
+                frame_paths = frames_from_video(Path(rotation_video_path), Path(frame_out_dir))
             except Exception as exc:
                 _logger.warning("frames_from_video failed: %s", exc)
 
@@ -113,16 +111,17 @@ class DraftAssembler:
             narration = await self._transcribe(narration_path)
 
         # 4. VLM extraction
-        vlm_result = await self._vlm.extract_product_info(
-            frame_paths[:4], narration=narration
-        )
+        vlm_result = await self._vlm.extract_product_info(frame_paths[:4], narration=narration)
 
         # 5. Dimensions from depth
         dimensions: Optional[tuple[float, float, float]] = None
         if depth_path:
             try:
-                grid = np.load(depth_path) if depth_path.endswith(".npy") else \
-                       np.array(json.loads(Path(depth_path).read_text()))
+                grid = (
+                    np.load(depth_path)
+                    if depth_path.endswith(".npy")
+                    else np.array(json.loads(Path(depth_path).read_text()))
+                )
                 dimensions = depth_to_dimensions(grid)
             except Exception as exc:
                 _logger.warning("depth_to_dimensions failed: %s", exc)
