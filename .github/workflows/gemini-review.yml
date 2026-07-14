@@ -1,7 +1,14 @@
 name: gemini-review
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review (leave empty for PR event)"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -13,12 +20,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      PR_NUMBER: ${{ github.event.pull_request.number }}
       REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Check PR context
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ github.event.inputs.pr_number || github.event.pull_request.number }}"
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No PR number provided. Skipping."
+            exit 0
+          fi
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
 
       - name: Collect diff
         env:
@@ -26,7 +43,7 @@ jobs:
         run: |
           # Cap at 50 KB — Gemini Flash has a 1 M-token context but PR diffs
           # this large are rarely useful in a review comment.
-          gh pr diff "$PR_NUMBER" --repo "$REPO" | head -c 51200 > /tmp/pr.diff
+          gh pr diff "$PR_NUMBER" --repo "${{ github.repository }}" | head -c 51200 > /tmp/pr.diff
 
       - name: Review with Gemini Flash
         env:
@@ -71,7 +88,10 @@ jobs:
               "*Automated review via gemini-review workflow*"
           )
 
-          pr = os.environ["PR_NUMBER"]
+          pr = os.environ.get("PR_NUMBER", "")
+          if not pr:
+              print("PR_NUMBER not set. Skipping.")
+              sys.exit(0)
           repo = os.environ["REPO"]
           subprocess.run(
               ["gh", "pr", "comment", pr, "--repo", repo, "--body", body],
